@@ -20,6 +20,8 @@ import org.codehaus.groovy.transform.TupleConstructorASTTransformation
 import te.ast.ctor.domain.ASTParams
 import te.ast.ctor.domain.ParsedAST
 
+import javax.inject.Inject
+
 import static org.codehaus.groovy.ast.ClassHelper.make
 import static org.codehaus.groovy.ast.ClassHelper.makeWithoutCaching
 import static org.codehaus.groovy.ast.tools.GeneralUtils.args
@@ -41,7 +43,8 @@ class SingleConstructorASTTransformation extends AbstractASTTransformation {
     public static final Class MY_CLASS = SingleConstructor
     public static final ClassNode MY_TYPE = make(MY_CLASS)
     public static final String MY_TYPE_NAME = "@" + MY_TYPE.getNameWithoutPackage()
-    private static final ClassNode CANONICAL_ANNOTATION = make(Canonical)
+    private static final ClassNode CANONICAL_ANNOTATION_CLASS = make(Canonical)
+    private static final AnnotationNode INJECT_ANNOTATION = new AnnotationNode(make(Inject))
     private static final ClassNode HMAP_TYPE = makeWithoutCaching(HashMap, false)
 
     void visit(ASTNode[] nodes, SourceUnit source) {
@@ -61,7 +64,7 @@ class SingleConstructorASTTransformation extends AbstractASTTransformation {
 
     protected void visitClass(ClassNode node, AnnotationNode annotation) {
         ASTParams astParams = readASTParamsFromAnnotation(annotation)
-        if (hasAnnotation(node, CANONICAL_ANNOTATION)) {
+        if (hasAnnotation(node, CANONICAL_ANNOTATION_CLASS)) {
             copyParamsFromCanonicalAST(node, astParams)
         }
 
@@ -103,7 +106,7 @@ class SingleConstructorASTTransformation extends AbstractASTTransformation {
     }
 
     protected void copyParamsFromCanonicalAST(ClassNode cNode, ASTParams astParams) {
-        AnnotationNode canonical = cNode.getAnnotations(CANONICAL_ANNOTATION).first()
+        AnnotationNode canonical = cNode.getAnnotations(CANONICAL_ANNOTATION_CLASS).first()
         if (!astParams.excludes) {
             astParams.excludes = getMemberList(canonical, "excludes")
         }
@@ -116,17 +119,23 @@ class SingleConstructorASTTransformation extends AbstractASTTransformation {
         ParsedAST parsedAST = parseClassAST(cNode, astParams)
 
         cNode.addConstructor(
-                new ConstructorNode(
-                        ACC_PUBLIC,
-                        parsedAST.toParamArray(),
-                        ClassNode.EMPTY_ARRAY,
-                        parsedAST.getConstructorBody()
-                )
+                createConstructor(parsedAST)
         )
 
         if (parsedAST.constructorArgs) {
             handleMapConstructorInjection(cNode, parsedAST.constructorArgs)
         }
+    }
+
+    protected static ConstructorNode createConstructor(ParsedAST parsedAST) {
+        def constructor = new ConstructorNode(
+                ACC_PUBLIC,
+                parsedAST.toParamArray(),
+                ClassNode.EMPTY_ARRAY,
+                parsedAST.constructorBody
+        )
+        constructor.addAnnotation(INJECT_ANNOTATION)
+        return constructor
     }
 
     protected static ParsedAST parseClassAST(ClassNode cNode, ASTParams astParams) {

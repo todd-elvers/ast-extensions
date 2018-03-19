@@ -7,6 +7,7 @@ repositories {
 
 dependencies {
     compile "org.codehaus.groovy:groovy-all:$groovyVersion"
+    compile 'javax.inject:javax.inject:1'
 
     testCompile "org.codehaus.groovy:groovy-test:$groovyVersion"
 

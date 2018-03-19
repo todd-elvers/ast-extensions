@@ -18,20 +18,21 @@ and get to follow the best practice of constructor injection.
 
 ```groovy
 @SingleConstructor
-class Service {
-    String propertyOne
-    Boolean propertyTwo
+class BookService {
+    AuthorService authorService
+    IdService idService
 }
 ```
 would be transformed, at compile time, to
 ```groovy
-class Service {
-    String propertyOne
-    Boolean propertyTwo
+class BookService {
+    AuthorService authorService
+    IdService idService
     
-    Service(String propertyOne, Boolean propertyTwo) {
-        this.propertyOne = propertyOne
-        this.propertyTwo = propertyTwo
+    @Autowired
+    Service(AuthorService authorService, IdService idService) {
+        this.authorService = authorService
+        this.idService = idService
     }
 }
 ``` 

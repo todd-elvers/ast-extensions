@@ -1,4 +1,4 @@
-#AST Extensions
+# AST Extensions
 
 A project to store useful AST transformations I've made.
 
@@ -39,5 +39,5 @@ class Service {
 <br/>
  
 
-####NOTE
+#### NOTE
 No releases currently, this is still in alpha.

@@ -29,7 +29,7 @@ class BookService {
     AuthorService authorService
     IdService idService
     
-    @Autowired
+    @Inject
     Service(AuthorService authorService, IdService idService) {
         this.authorService = authorService
         this.idService = idService

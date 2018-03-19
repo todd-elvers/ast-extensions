@@ -35,15 +35,15 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.varX
 @GroovyASTTransformation(phase = CompilePhase.CANONICALIZATION)
 class SingleConstructorASTTransformation extends AbstractASTTransformation {
 
-    static final Class MY_CLASS = SingleConstructor.class
+    static final Class MY_CLASS = SingleConstructor
     static final ClassNode MY_TYPE = make(MY_CLASS)
     static final String MY_TYPE_NAME = "@" + MY_TYPE.getNameWithoutPackage()
-    private static final ClassNode CANONICAL_ANNOTATION = make(Canonical.class)
-    private static final ClassNode HMAP_TYPE = makeWithoutCaching(HashMap.class, false)
+    private static final ClassNode CANONICAL_ANNOTATION = make(Canonical)
+    private static final ClassNode HMAP_TYPE = makeWithoutCaching(HashMap, false)
 
     void visit(ASTNode[] nodes, SourceUnit source) {
         init(nodes, source)
-        
+
         AnnotatedNode parent = nodes[1] as AnnotatedNode
         AnnotationNode anno = nodes[0] as AnnotationNode
 
@@ -119,7 +119,7 @@ class SingleConstructorASTTransformation extends AbstractASTTransformation {
         // HACK: JavaStubGenerator could have snuck in a constructor we don't want
         if (foundEmpty) constructors.remove(0)
 
-        List<FieldNode> superList = new ArrayList<FieldNode>()
+        List<FieldNode> superList = []
         if (config.includeSuperProperties) {
             superList.addAll(getSuperPropertyFields(cNode.getSuperClass()))
         }
@@ -127,23 +127,24 @@ class SingleConstructorASTTransformation extends AbstractASTTransformation {
             superList.addAll(getSuperNonPropertyFields(cNode.getSuperClass()))
         }
 
-        List<FieldNode> list = new ArrayList<FieldNode>()
+        List<FieldNode> list = []
         if (config.includeProperties) {
-            list.addAll(getInstancePropertyFields(cNode))
+            list += getInstancePropertyFields(cNode)
         }
         if (config.includeFields) {
-            list.addAll(getInstanceNonPropertyFields(cNode))
+            list += getInstanceNonPropertyFields(cNode)
         }
 
-        final List<Parameter> params = new ArrayList<Parameter>()
-        final List<Expression> superParams = new ArrayList<Expression>()
+        final List<Parameter> params = []
+        final List<Expression> superParams = []
         final BlockStatement body = new BlockStatement()
-        for (FieldNode fNode : superList) {
+        superList.each { FieldNode fNode ->
+            if (shouldSkip(fNode.getName(), config.excludes, config.includes)) return
+
             String name = fNode.getName()
-            if (shouldSkip(name, config.excludes, config.includes)) continue
             params.add(createParam(fNode, name))
             if (config.callSuper) {
-                superParams.add(varX(name))
+                superParams << varX(name)
             } else {
                 body.addStatement(assignS(propX(varX("this"), name), varX(name)))
             }
@@ -151,14 +152,22 @@ class SingleConstructorASTTransformation extends AbstractASTTransformation {
         if (config.callSuper) {
             body.addStatement(stmt(ctorX(ClassNode.SUPER, args(superParams))))
         }
-        for (FieldNode fNode : list) {
+        list.each { FieldNode fNode ->
+            if (shouldSkip(fNode.getName(), config.excludes, config.includes)) return
+
             String name = fNode.getName()
-            if (shouldSkip(name, config.excludes, config.includes)) continue
             Parameter nextParam = createParam(fNode, name)
-            params.add(nextParam)
+            params << nextParam
             body.addStatement(assignS(propX(varX("this"), name), varX(nextParam)))
         }
-        cNode.addConstructor(new ConstructorNode(ACC_PUBLIC, params.toArray(new Parameter[params.size()]), ClassNode.EMPTY_ARRAY, body))
+        cNode.addConstructor(
+                new ConstructorNode(
+                        ACC_PUBLIC,
+                        params.toArray(new Parameter[params.size()]),
+                        ClassNode.EMPTY_ARRAY, 
+                        body
+                )
+        )
         // add map constructor if needed, don't do it for LinkedHashMap for now (would lead to duplicate signature)
         // or if there is only one Map property (for backwards compatibility)
         if (!params.isEmpty()) {

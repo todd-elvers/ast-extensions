@@ -1,0 +1,24 @@
+apply plugin: 'groovy'
+apply plugin: 'idea'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compile "org.codehaus.groovy:groovy-all:$groovyVersion"
+
+    testCompile "org.codehaus.groovy:groovy-test:$groovyVersion"
+
+    // Spock
+    testCompile 'cglib:cglib-nodep:3.2.6'
+    testCompile 'org.objenesis:objenesis:2.6'
+    testCompile 'org.spockframework:spock-core:1.1-groovy-2.4'
+}
+
+idea {
+    module {
+        downloadJavadoc = true
+        downloadSources = true
+    }
+}

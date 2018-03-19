@@ -17,6 +17,8 @@ import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.transform.AbstractASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
 import org.codehaus.groovy.transform.TupleConstructorASTTransformation
+import te.ast.ctor.domain.ASTParams
+import te.ast.ctor.domain.ParsedAST
 
 import static org.codehaus.groovy.ast.ClassHelper.make
 import static org.codehaus.groovy.ast.ClassHelper.makeWithoutCaching
@@ -32,12 +34,13 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.stmt
 import static org.codehaus.groovy.ast.tools.GeneralUtils.varX
 
 @CompileStatic
+@SuppressWarnings("GrMethodMayBeStatic")
 @GroovyASTTransformation(phase = CompilePhase.CANONICALIZATION)
 class SingleConstructorASTTransformation extends AbstractASTTransformation {
 
-    static final Class MY_CLASS = SingleConstructor
-    static final ClassNode MY_TYPE = make(MY_CLASS)
-    static final String MY_TYPE_NAME = "@" + MY_TYPE.getNameWithoutPackage()
+    public static final Class MY_CLASS = SingleConstructor
+    public static final ClassNode MY_TYPE = make(MY_CLASS)
+    public static final String MY_TYPE_NAME = "@" + MY_TYPE.getNameWithoutPackage()
     private static final ClassNode CANONICAL_ANNOTATION = make(Canonical)
     private static final ClassNode HMAP_TYPE = makeWithoutCaching(HashMap, false)
 
@@ -47,7 +50,7 @@ class SingleConstructorASTTransformation extends AbstractASTTransformation {
         AnnotatedNode parent = nodes[1] as AnnotatedNode
         AnnotationNode anno = nodes[0] as AnnotationNode
 
-        if (MY_TYPE != anno.getClassNode()) {
+        if (anno.classNode != MY_TYPE) {
             return
         }
 
@@ -56,24 +59,37 @@ class SingleConstructorASTTransformation extends AbstractASTTransformation {
         }
     }
 
-    void visitClass(ClassNode cNode, AnnotationNode anno) {
-        if (!checkNotInterface(cNode, MY_TYPE_NAME)) {
-            return
+    protected void visitClass(ClassNode node, AnnotationNode annotation) {
+        ASTParams astParams = readASTParamsFromAnnotation(annotation)
+        if (hasAnnotation(node, CANONICAL_ANNOTATION)) {
+            copyParamsFromCanonicalAST(node, astParams)
         }
 
-        AnnotationConfig config = createAnnotationConfig(anno)
-        if (hasAnnotation(cNode, CANONICAL_ANNOTATION)) {
-            config.copyPropertiesFromCanonicalAST(cNode)
+        if (isValidUseOfAST(annotation, node, astParams)) {
+            injectConstructor(node, astParams)
         }
-
-        if (!checkIncludeExclude(anno, config.excludes, config.includes, MY_TYPE_NAME)) {
-            return
-        }
-
-        createConstructor(cNode, config)
     }
 
-    protected AnnotationConfig createAnnotationConfig(AnnotationNode anno) {
+    protected boolean isValidUseOfAST(AnnotationNode anno, ClassNode cNode, ASTParams astParams) {
+        // Annotation not allowed on interfaces
+        if(!checkNotInterface(cNode, MY_TYPE_NAME)) return false
+
+        // Cannot proceed if 'includes' & 'excludes' are improperly configured
+        if(!checkIncludeExclude(anno, astParams.excludes, astParams.includes, MY_TYPE_NAME)) return false
+
+        // Don't do anything if constructors exist and force is set to false
+        List<ConstructorNode> ctors = cNode.declaredConstructors
+        if(ctors.size() > 1 && !astParams.force) return false
+        boolean foundEmpty = ctors.size() == 1 && !ctors.first().firstStatement
+        if(ctors.size() == 1 && !foundEmpty && !astParams.force) return false
+
+        // HACK: JavaStubGenerator could have snuck in a constructor we don't want
+        if (foundEmpty) ctors.remove(0)
+
+        return true
+    }
+
+    protected ASTParams readASTParamsFromAnnotation(AnnotationNode anno) {
         return [
                 includeFields         : memberHasValue(anno, "includeFields", true),
                 includeProperties     : !memberHasValue(anno, "includeProperties", false),
@@ -83,114 +99,131 @@ class SingleConstructorASTTransformation extends AbstractASTTransformation {
                 force                 : memberHasValue(anno, "force", true),
                 excludes              : getMemberList(anno, "excludes"),
                 includes              : getMemberList(anno, "includes")
-        ] as AnnotationConfig
+        ] as ASTParams
     }
 
-    static class AnnotationConfig {
-        boolean includeFields,
-                includeProperties,
-                includeSuperFields,
-                includeSuperProperties,
-                callSuper,
-                force
-
-        List<String> includes,
-                     excludes
-
-        void copyPropertiesFromCanonicalAST(ClassNode cNode) {
-            AnnotationNode canonical = cNode.getAnnotations(CANONICAL_ANNOTATION).get(0)
-            if (excludes == null || excludes.isEmpty()) {
-                excludes = getMemberList(canonical, "excludes")
-            }
-            if (includes == null || includes.isEmpty()) {
-                includes = getMemberList(canonical, "includes")
-            }
+    protected void copyParamsFromCanonicalAST(ClassNode cNode, ASTParams astParams) {
+        AnnotationNode canonical = cNode.getAnnotations(CANONICAL_ANNOTATION).first()
+        if (!astParams.excludes) {
+            astParams.excludes = getMemberList(canonical, "excludes")
+        }
+        if (!astParams.includes) {
+            astParams.includes = getMemberList(canonical, "includes")
         }
     }
 
-    static void createConstructor(ClassNode cNode, AnnotationConfig config) {
-        // no processing if existing constructors found
-        List<ConstructorNode> constructors = cNode.getDeclaredConstructors()
-        if (constructors.size() > 1 && !config.force) return
+    protected static void injectConstructor(ClassNode cNode, ASTParams astParams) {
+        ParsedAST parsedAST = parseClassAST(cNode, astParams)
 
-        boolean foundEmpty = constructors.size() == 1 && constructors.get(0).getFirstStatement() == null
-        if (constructors.size() == 1 && !foundEmpty && !config.force) return
+        cNode.addConstructor(
+                new ConstructorNode(
+                        ACC_PUBLIC,
+                        parsedAST.toParamArray(),
+                        ClassNode.EMPTY_ARRAY,
+                        parsedAST.getConstructorBody()
+                )
+        )
 
-        // HACK: JavaStubGenerator could have snuck in a constructor we don't want
-        if (foundEmpty) constructors.remove(0)
-
-        List<FieldNode> superList = []
-        if (config.includeSuperProperties) {
-            superList.addAll(getSuperPropertyFields(cNode.getSuperClass()))
+        if (parsedAST.constructorArgs) {
+            handleMapConstructorInjection(cNode, parsedAST.constructorArgs)
         }
-        if (config.includeSuperFields) {
-            superList.addAll(getSuperNonPropertyFields(cNode.getSuperClass()))
-        }
+    }
 
-        List<FieldNode> list = []
-        if (config.includeProperties) {
-            list += getInstancePropertyFields(cNode)
-        }
-        if (config.includeFields) {
-            list += getInstanceNonPropertyFields(cNode)
-        }
+    protected static ParsedAST parseClassAST(ClassNode cNode, ASTParams astParams) {
+        List<Parameter> params = []
+        List<Expression> superParams = []
+        BlockStatement body = new BlockStatement()
 
-        final List<Parameter> params = []
-        final List<Expression> superParams = []
-        final BlockStatement body = new BlockStatement()
-        superList.each { FieldNode fNode ->
-            if (shouldSkip(fNode.getName(), config.excludes, config.includes)) return
+        // Build params from the super's fields
+        List<FieldNode> superFieldNodes = collectSuperFieldNodes(cNode, astParams)
+        superFieldNodes.each { FieldNode fNode ->
+            if (shouldSkip(fNode.getName(), astParams.excludes, astParams.includes)) return
 
             String name = fNode.getName()
-            params.add(createParam(fNode, name))
-            if (config.callSuper) {
+            params << new Parameter(fNode.getType(), name)
+            if (astParams.callSuper) {
                 superParams << varX(name)
             } else {
                 body.addStatement(assignS(propX(varX("this"), name), varX(name)))
             }
         }
-        if (config.callSuper) {
+
+        // Add a call to the super's constructor if necessary
+        if (astParams.callSuper) {
             body.addStatement(stmt(ctorX(ClassNode.SUPER, args(superParams))))
         }
-        list.each { FieldNode fNode ->
-            if (shouldSkip(fNode.getName(), config.excludes, config.includes)) return
+
+        // Build params from the instance's fields
+        List<FieldNode> instanceFieldNodes = collectInstanceFieldNodes(cNode, astParams)
+        instanceFieldNodes.each { FieldNode fNode ->
+            if (shouldSkip(fNode.getName(), astParams.excludes, astParams.includes)) return
 
             String name = fNode.getName()
-            Parameter nextParam = createParam(fNode, name)
+            Parameter nextParam = new Parameter(fNode.getType(), name)
             params << nextParam
             body.addStatement(assignS(propX(varX("this"), name), varX(nextParam)))
         }
-        cNode.addConstructor(
-                new ConstructorNode(
-                        ACC_PUBLIC,
-                        params.toArray(new Parameter[params.size()]),
-                        ClassNode.EMPTY_ARRAY, 
-                        body
-                )
-        )
+
+        return new ParsedAST(constructorArgs: params, constructorBody: body)
+    }
+
+    protected static List<FieldNode> collectSuperFieldNodes(ClassNode cNode, ASTParams astParams) {
+        List<FieldNode> superList = []
+        if (astParams.includeSuperProperties) {
+            superList += getSuperPropertyFields(cNode.getSuperClass())
+        }
+        if (astParams.includeSuperFields) {
+            superList += getSuperNonPropertyFields(cNode.getSuperClass())
+        }
+        return superList
+    }
+
+    protected static List<FieldNode> collectInstanceFieldNodes(ClassNode cNode, ASTParams astParams) {
+        List<FieldNode> list = []
+        if (astParams.includeProperties) {
+            list += getInstancePropertyFields(cNode)
+        }
+        if (astParams.includeFields) {
+            list += getInstanceNonPropertyFields(cNode)
+        }
+        return list
+    }
+
+    /**
+     * Adds a map constructor to a class if the first constructor {@link Parameter}
+     * is of type {@link Map} or some superclass of {@link HashMap} (excluding LinkedHashMap).
+     */
+    private static void handleMapConstructorInjection(ClassNode cNode, List<Parameter> constructorArgs) {
+        ClassNode firstParam = constructorArgs.first().getType()
+
         // add map constructor if needed, don't do it for LinkedHashMap for now (would lead to duplicate signature)
         // or if there is only one Map property (for backwards compatibility)
-        if (!params.isEmpty()) {
-            ClassNode firstParam = params.get(0).getType()
-            if (params.size() > 1 || firstParam == ClassHelper.OBJECT_TYPE) {
-                if (firstParam == ClassHelper.MAP_TYPE) {
-                    TupleConstructorASTTransformation.addMapConstructors(cNode, true, "The class " + cNode.getName() + " was incorrectly initialized via the map constructor with null.")
-                } else {
-                    ClassNode candidate = HMAP_TYPE
-                    while (candidate != null) {
-                        if (candidate == firstParam) {
-                            TupleConstructorASTTransformation.addMapConstructors(cNode, true, "The class " + cNode.getName() + " was incorrectly initialized via the map constructor with null.")
-                            break
-                        }
-                        candidate = candidate.getSuperClass()
+        if (constructorArgs.size() > 1 || firstParam == ClassHelper.OBJECT_TYPE) {
+            if (firstParam == ClassHelper.MAP_TYPE) {
+                addMapConstructors(cNode)
+            } else {
+                ClassNode candidate = HMAP_TYPE
+                while (candidate) {
+                    if (candidate == firstParam) {
+                        addMapConstructors(cNode)
+                        break
                     }
+
+                    candidate = candidate.getSuperClass()
                 }
             }
         }
     }
 
-    private static Parameter createParam(FieldNode fNode, String name) {
-        return new Parameter(fNode.getType(), name)
+    /**
+     * To reduce code duplication we simply delegate to {@link TupleConstructorASTTransformation}
+     * since it already does what we need here.
+     */
+    private static void addMapConstructors(ClassNode cNode) {
+        TupleConstructorASTTransformation.addMapConstructors(
+                cNode,
+                true,
+                "The class " + cNode.getName() + " was incorrectly initialized via the map constructor with null."
+        )
     }
-
 }

@@ -70,6 +70,64 @@ class TwoProperties {
     List<String> someListProperty
 }
 
+@ASTTest(phase = CANONICALIZATION, value = {
+    def classNode = node as ClassNode
+
+    // Should only have one constructor with one args
+    assert classNode.declaredConstructors.size() == 1
+    assert classNode.declaredConstructors[0].parameters.size() == 1
+
+    // Only arg should be the property we didn't specify in the 'excludes' list
+    def firstConstructorArg = classNode.declaredConstructors[0].parameters[0]
+    assert firstConstructorArg.name == "someProperty"
+    assert firstConstructorArg.type.text == "java.lang.String"
+    assert !firstConstructorArg.hasInitialExpression()
+})
+@SingleConstructor(excludes = "someListProperty")
+class PropertiesWithExcludes {
+    String someProperty
+    List<String> someListProperty
+}
+
+
+@ASTTest(phase = CANONICALIZATION, value = {
+    def classNode = node as ClassNode
+
+    // Should only have one constructor with one args
+    assert classNode.declaredConstructors.size() == 1
+    assert classNode.declaredConstructors[0].parameters.size() == 1
+
+    // Only arg should be the property we specified in the 'includes' list
+    def firstConstructorArg = classNode.declaredConstructors[0].parameters[0]
+    assert firstConstructorArg.name == "someProperty"
+    assert firstConstructorArg.type.text == "java.lang.String"
+    assert !firstConstructorArg.hasInitialExpression()
+})
+@SingleConstructor(includes = "someProperty")
+class PropertiesWithIncludes {
+    String someProperty
+    List<String> someListProperty
+}
+
+@ASTTest(phase = CANONICALIZATION, value = {
+    def classNode = node as ClassNode
+
+    // Should only have one constructor with one args
+    assert classNode.declaredConstructors.size() == 1
+    assert classNode.declaredConstructors[0].parameters.size() == 1
+
+    // Only arg should be the only field of the class, and no properties
+    def firstConstructorArg = classNode.declaredConstructors[0].parameters[0]
+    assert firstConstructorArg.name == "someProperty"
+    assert firstConstructorArg.type.text == "java.lang.String"
+    assert !firstConstructorArg.hasInitialExpression()
+})
+@SingleConstructor(includeFields = true, includeProperties = false, excludes = 'metaClass')
+class IgnoringPropertiesIncludingFields {
+    private String someProperty
+    List<String> someListProperty
+}
+
 
 @ASTTest(phase = CANONICALIZATION, value = {
     def classNode = node as ClassNode
@@ -120,3 +178,4 @@ class PropertiesIncludingFields {
     private String someField1
     protected boolean someField2
 }
+

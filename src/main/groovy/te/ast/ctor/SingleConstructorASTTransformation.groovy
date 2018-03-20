@@ -40,25 +40,24 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.varX
 @GroovyASTTransformation(phase = CompilePhase.CANONICALIZATION)
 class SingleConstructorASTTransformation extends AbstractASTTransformation {
 
-    public static final Class MY_CLASS = SingleConstructor
-    public static final ClassNode MY_TYPE = make(MY_CLASS)
-    public static final String MY_TYPE_NAME = "@" + MY_TYPE.getNameWithoutPackage()
+    private static final ClassNode MY_TYPE = make(SingleConstructor)
     private static final ClassNode CANONICAL_ANNOTATION_CLASS = make(Canonical)
+    private static final ClassNode HASHMAP_TYPE = makeWithoutCaching(HashMap, false)
     private static final AnnotationNode INJECT_ANNOTATION = new AnnotationNode(make(Inject))
-    private static final ClassNode HMAP_TYPE = makeWithoutCaching(HashMap, false)
+    private static final String MY_TYPE_NAME = "@" + MY_TYPE.getNameWithoutPackage()
 
     void visit(ASTNode[] nodes, SourceUnit source) {
         init(nodes, source)
 
         AnnotatedNode parent = nodes[1] as AnnotatedNode
-        AnnotationNode anno = nodes[0] as AnnotationNode
+        AnnotationNode annotation = nodes[0] as AnnotationNode
 
-        if (anno.classNode != MY_TYPE) {
+        if (annotation.classNode != MY_TYPE) {
             return
         }
 
         if (parent instanceof ClassNode) {
-            visitClass(parent, anno)
+            visitClass(parent, annotation)
         }
     }
 
@@ -128,12 +127,7 @@ class SingleConstructorASTTransformation extends AbstractASTTransformation {
     }
 
     protected static ConstructorNode createConstructor(ParsedAST parsedAST) {
-        def constructor = new ConstructorNode(
-                ACC_PUBLIC,
-                parsedAST.toParamArray(),
-                ClassNode.EMPTY_ARRAY,
-                parsedAST.constructorBody
-        )
+        def constructor = new ConstructorNode(ACC_PUBLIC, parsedAST.toParamArray(), ClassNode.EMPTY_ARRAY, parsedAST.constructorBody)
         constructor.addAnnotation(INJECT_ANNOTATION)
         return constructor
     }
@@ -211,7 +205,7 @@ class SingleConstructorASTTransformation extends AbstractASTTransformation {
             if (firstParam == ClassHelper.MAP_TYPE) {
                 addMapConstructors(cNode)
             } else {
-                ClassNode candidate = HMAP_TYPE
+                ClassNode candidate = HASHMAP_TYPE
                 while (candidate) {
                     if (candidate == firstParam) {
                         addMapConstructors(cNode)

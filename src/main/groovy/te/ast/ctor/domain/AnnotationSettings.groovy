@@ -2,8 +2,6 @@ package te.ast.ctor.domain
 
 import groovy.transform.CompileStatic
 import groovy.transform.ToString
-import org.codehaus.groovy.ast.AnnotationNode
-import org.codehaus.groovy.ast.ClassNode
 import te.ast.ctor.SingleConstructor
 
 /**
@@ -12,7 +10,7 @@ import te.ast.ctor.SingleConstructor
  */
 @CompileStatic
 @ToString(includePackage = false, includeNames = true)
-class ASTParams {
+class AnnotationSettings {
     boolean includeFields,
             includeProperties,
             includeSuperFields,

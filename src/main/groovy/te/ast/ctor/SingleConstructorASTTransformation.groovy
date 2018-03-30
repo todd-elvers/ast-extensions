@@ -12,6 +12,7 @@ import org.codehaus.groovy.ast.FieldNode
 import org.codehaus.groovy.ast.Parameter
 import org.codehaus.groovy.ast.expr.Expression
 import org.codehaus.groovy.ast.stmt.BlockStatement
+import org.codehaus.groovy.ast.stmt.Statement
 import org.codehaus.groovy.control.CompilePhase
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.transform.AbstractASTTransformation
@@ -25,15 +26,16 @@ import static org.codehaus.groovy.ast.ClassHelper.make
 import static org.codehaus.groovy.ast.ClassHelper.makeWithoutCaching
 import static org.codehaus.groovy.ast.tools.GeneralUtils.args
 import static org.codehaus.groovy.ast.tools.GeneralUtils.assignS
-import static org.codehaus.groovy.ast.tools.GeneralUtils.ctorX
+import static org.codehaus.groovy.ast.tools.GeneralUtils.block
+import static org.codehaus.groovy.ast.tools.GeneralUtils.ctorSuperS
 import static org.codehaus.groovy.ast.tools.GeneralUtils.getInstanceNonPropertyFields
 import static org.codehaus.groovy.ast.tools.GeneralUtils.getInstancePropertyFields
 import static org.codehaus.groovy.ast.tools.GeneralUtils.getSuperNonPropertyFields
 import static org.codehaus.groovy.ast.tools.GeneralUtils.getSuperPropertyFields
 import static org.codehaus.groovy.ast.tools.GeneralUtils.propX
-import static org.codehaus.groovy.ast.tools.GeneralUtils.stmt
 import static org.codehaus.groovy.ast.tools.GeneralUtils.varX
 
+//TODO: Look for more utility methods that could simplify this logic.
 @CompileStatic
 @SuppressWarnings("GrMethodMayBeStatic")
 @GroovyASTTransformation(phase = CompilePhase.CANONICALIZATION)
@@ -41,7 +43,7 @@ class SingleConstructorASTTransformation extends AbstractASTTransformation {
 
     private static final ClassNode MY_TYPE = make(SingleConstructor)
     private static final ClassNode CANONICAL_ANNOTATION_CLASS = make(Canonical)
-    private static final ClassNode HASHMAP_TYPE = makeWithoutCaching(HashMap, false)
+    private static final ClassNode HASH_MAP_TYPE = makeWithoutCaching(HashMap, false)
     private static final AnnotationNode INJECT_ANNOTATION = new AnnotationNode(make(Inject))
     private static final String MY_TYPE_NAME = "@" + MY_TYPE.getNameWithoutPackage()
 
@@ -51,15 +53,9 @@ class SingleConstructorASTTransformation extends AbstractASTTransformation {
         AnnotationNode annotation = nodes[0] as AnnotationNode
         AnnotatedNode annotatedClass = nodes[1] as AnnotatedNode
 
-        if (wasTriggeredByWrongAnnotation(annotation)) return
-
         if (annotatedClass instanceof ClassNode) {
             visitClass(annotatedClass, annotation)
         }
-    }
-
-    protected boolean wasTriggeredByWrongAnnotation(AnnotationNode annotation) {
-        return annotation.classNode != MY_TYPE
     }
 
     protected void visitClass(ClassNode annotatedClass, AnnotationNode annotation) {
@@ -69,7 +65,11 @@ class SingleConstructorASTTransformation extends AbstractASTTransformation {
         }
 
         if (isValidUseOfAST(annotation, annotatedClass, settings)) {
-            injectConstructor(annotatedClass, settings)
+            ConstructorNode constructor = generateConstructor(annotatedClass, settings)
+
+            constructor.addAnnotation(INJECT_ANNOTATION)
+
+            addConstructor(annotatedClass, constructor)
         }
     }
 
@@ -115,9 +115,7 @@ class SingleConstructorASTTransformation extends AbstractASTTransformation {
         }
     }
 
-    protected static void injectConstructor(ClassNode annotatedClass, AnnotationSettings settings) {
-        ConstructorNode constructor = buildConstructor(annotatedClass, settings)
-
+    protected void addConstructor(ClassNode annotatedClass, ConstructorNode constructor) {
         annotatedClass.addConstructor(constructor)
 
         if (constructor.parameters) {
@@ -125,53 +123,52 @@ class SingleConstructorASTTransformation extends AbstractASTTransformation {
         }
     }
 
-    protected static ConstructorNode buildConstructor(ClassNode annotatedClass, AnnotationSettings settings) {
-        BlockStatement constructorBody = new BlockStatement()
-        List<Parameter> constructorArgs = []
+    /**
+     * Parses annotated class creating a constructor according to the settings configured
+     * in the {@link SingleConstructor} annotation.
+     *
+     * <p>The resulting constructor has 0-n args and a corresponding number of "this.<field> = <arg>"
+     * statements as its body.
+     */
+    protected static ConstructorNode generateConstructor(ClassNode annotatedClass, AnnotationSettings settings) {
+        List<Statement> ctorStatements = []
+        List<Parameter> ctorParams = []
+        List<Expression> superCtorExpressions = []
 
-        // Build constructorArgs from the super's fields
-        List<Expression> superParams = []
+        // Parse fields from super
         List<FieldNode> superFieldNodes = collectSuperFieldNodes(annotatedClass, settings)
         superFieldNodes.each { FieldNode fNode ->
             if (shouldSkip(fNode.name, settings.excludes, settings.includes)) return
 
             String name = fNode.name
-            constructorArgs << new Parameter(fNode.type, name)
+            ctorParams << new Parameter(fNode.type, name)
             if (settings.callSuper) {
-                superParams << varX(name)
+                superCtorExpressions << varX(name)
             } else {
-                constructorBody.addStatement(assignS(propX(varX("this"), name), varX(name)))
+                ctorStatements << assignS(propX(varX("this"), name), varX(name))
             }
         }
 
         // Add a call to the super's constructor if necessary
         if (settings.callSuper) {
-            constructorBody.addStatement(stmt(ctorX(ClassNode.SUPER, args(superParams))))
+            ctorStatements << ctorSuperS(args(superCtorExpressions))
         }
 
-        // Build constructorArgs from the instance's fields
+        // Parse fields from instance
         List<FieldNode> instanceFieldNodes = collectInstanceFieldNodes(annotatedClass, settings)
         instanceFieldNodes.each { FieldNode fNode ->
             if (shouldSkip(fNode.name, settings.excludes, settings.includes)) return
 
             String name = fNode.name
             Parameter nextParam = new Parameter(fNode.type, name)
-            constructorArgs << nextParam
-            constructorBody.addStatement(assignS(propX(varX("this"), name), varX(nextParam)))
+            ctorParams << nextParam
+            ctorStatements << assignS(propX(varX("this"), name), varX(nextParam))
         }
 
-        return createConstructor(constructorArgs, constructorBody)
-    }
+        Parameter[] argsOfCtor = ctorParams.toArray(new Parameter[ctorParams.size()])
+        BlockStatement bodyOfCtor = block(ctorStatements.toArray(new Statement[ctorStatements.size()]))
 
-    protected static ConstructorNode createConstructor(List<Parameter> args, BlockStatement body) {
-        def constructor = new ConstructorNode(
-                ACC_PUBLIC,
-                args.toArray(new Parameter[args.size()]),
-                ClassNode.EMPTY_ARRAY,
-                body
-        )
-        constructor.addAnnotation(INJECT_ANNOTATION)
-        return constructor
+        return new ConstructorNode(ACC_PUBLIC, argsOfCtor, ClassNode.EMPTY_ARRAY, bodyOfCtor)
     }
 
     protected static List<FieldNode> collectSuperFieldNodes(ClassNode annotatedClass, AnnotationSettings settings) {
@@ -209,7 +206,7 @@ class SingleConstructorASTTransformation extends AbstractASTTransformation {
             if (firstParam == ClassHelper.MAP_TYPE) {
                 addMapConstructors(annotatedClass)
             } else {
-                ClassNode candidate = HASHMAP_TYPE
+                ClassNode candidate = HASH_MAP_TYPE
                 while (candidate) {
                     if (candidate == firstParam) {
                         addMapConstructors(annotatedClass)

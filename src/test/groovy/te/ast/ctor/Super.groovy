@@ -90,8 +90,13 @@ class SuperWithPropertyAndConstructor extends PropertyWithConstructor {
 }
 abstract class PropertyWithConstructor {
     String someSuperProperty
-//    PropertyWithConstructor(){}
-//    PropertyWithConstructor(String someSuperProperty) {
-//        this.someSuperProperty = someSuperProperty
-//    }
+    PropertyWithConstructor(){}
+    PropertyWithConstructor(String someSuperProperty) {
+        this.someSuperProperty = someSuperProperty + "_from_super"
+    }
 }
+
+//TODO: Separate out ASTTests & unit tests
+def result = new SuperWithPropertyAndConstructor("arg1", "arg2")
+assert result.someSuperProperty == "arg1_from_super"
+assert result.someProperty == "arg2"

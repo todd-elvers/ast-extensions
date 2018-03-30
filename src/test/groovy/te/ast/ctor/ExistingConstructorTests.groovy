@@ -2,6 +2,7 @@ package te.ast.ctor
 
 import groovy.transform.ASTTest
 import org.codehaus.groovy.ast.ClassNode
+import te.ast.ctor.SingleConstructor
 
 import static org.codehaus.groovy.control.CompilePhase.CANONICALIZATION
 
@@ -61,20 +62,4 @@ class ExistingConstructorWithForce {
     ExistingConstructorWithForce(String someField) {
         this.someField = someField
     }
-}
-
-@ASTTest(phase = CANONICALIZATION, value = {
-    def classNode = node as ClassNode
-
-    // One constructor should get injected with one arg
-    assert classNode.declaredConstructors.size() == 1
-    assert classNode.declaredConstructors[0].parameters.size() == 1
-
-    // The injected constructor should have the @Inject annotation on it
-    assert classNode.declaredConstructors[0].annotations.size() == 1
-    assert classNode.declaredConstructors[0].annotations.first().classNode.name == "javax.inject.Inject"
-})
-@SingleConstructor
-class InjectAnnotation {
-    String someProperty
 }

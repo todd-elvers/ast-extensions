@@ -4,6 +4,7 @@ import groovy.transform.ASTTest
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.ConstructorNode
 import org.codehaus.groovy.ast.Parameter
+import te.ast.ctor.SingleConstructor
 
 import static org.codehaus.groovy.control.CompilePhase.CANONICALIZATION
 

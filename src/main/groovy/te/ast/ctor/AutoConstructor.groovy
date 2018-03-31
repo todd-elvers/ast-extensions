@@ -17,8 +17,8 @@ import java.lang.annotation.Target
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
-@GroovyASTTransformationClass(classes = [SingleConstructorASTTransformation])
-@interface SingleConstructor {
+@GroovyASTTransformationClass(classes = [AutoConstructorASTTransformation])
+@interface AutoConstructor {
     /**
      * List of field and/or property names to exclude from the constructor.
      * Must not be used if 'includes' is used. For convenience, a String with comma separated names
@@ -65,4 +65,7 @@ import java.lang.annotation.Target
      * whether existing constructors exist. It is up to you to avoid creating duplicate constructors.
      */
     boolean force() default false
+
+    boolean addInjectAnnotation() default true
 }
+

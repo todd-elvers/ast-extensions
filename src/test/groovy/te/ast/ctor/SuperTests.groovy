@@ -24,7 +24,7 @@ import static org.codehaus.groovy.control.CompilePhase.CANONICALIZATION
     assert thirdArg.type.text == "java.lang.String"
     assert !thirdArg.hasInitialExpression()
 })
-@SingleConstructor(includeSuperProperties = true)
+@AutoConstructor(includeSuperProperties = true)
 class SuperWithProperties extends Properties {
     String someProperty
 }
@@ -56,7 +56,7 @@ abstract class Properties {
     assert fourthArg.type.text == "java.lang.String"
     assert !fourthArg.hasInitialExpression()
 })
-@SingleConstructor(includeSuperProperties = true, includeSuperFields = true, excludes = 'metaClass')
+@AutoConstructor(includeSuperProperties = true, includeSuperFields = true, excludes = 'metaClass')
 class SuperWithPropertiesAndFields extends PropertiesAndFields {
     String someProperty
 }
@@ -84,7 +84,7 @@ abstract class PropertiesAndFields {
     assert secondArg.type.text == "java.lang.String"
     assert !secondArg.hasInitialExpression()
 })
-@SingleConstructor(includeSuperProperties = true, callSuper = true)
+@AutoConstructor(includeSuperProperties = true, callSuper = true)
 class SuperWithPropertyAndConstructor extends PropertyWithConstructor {
     String someProperty
 }

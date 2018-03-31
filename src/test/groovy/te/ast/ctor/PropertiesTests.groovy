@@ -2,9 +2,6 @@ package te.ast.ctor
 
 import groovy.transform.ASTTest
 import org.codehaus.groovy.ast.ClassNode
-import org.codehaus.groovy.ast.ConstructorNode
-import org.codehaus.groovy.ast.Parameter
-import te.ast.ctor.SingleConstructor
 
 import static org.codehaus.groovy.control.CompilePhase.CANONICALIZATION
 
@@ -20,7 +17,7 @@ import static org.codehaus.groovy.control.CompilePhase.CANONICALIZATION
     assert constructor.name == "<init>"
     assert !constructor.parameters
 })
-@SingleConstructor
+@AutoConstructor
 class ZeroProperties {
 }
 
@@ -39,7 +36,7 @@ class ZeroProperties {
     assert firstConstructorArg.type.text == "java.lang.String"
     assert !firstConstructorArg.hasInitialExpression()
 })
-@SingleConstructor
+@AutoConstructor
 class OneProperty {
     String someProperty
 }
@@ -65,7 +62,7 @@ class OneProperty {
     assert secondConstructorArg.type.text == "java.util.List"
     assert !secondConstructorArg.hasInitialExpression()
 })
-@SingleConstructor
+@AutoConstructor
 class TwoProperties {
     String someProperty
     List<String> someListProperty
@@ -84,7 +81,7 @@ class TwoProperties {
     assert firstConstructorArg.type.text == "java.lang.String"
     assert !firstConstructorArg.hasInitialExpression()
 })
-@SingleConstructor(excludes = "someListProperty")
+@AutoConstructor(excludes = "someListProperty")
 class PropertiesWithExcludes {
     String someProperty
     List<String> someListProperty
@@ -104,7 +101,7 @@ class PropertiesWithExcludes {
     assert firstConstructorArg.type.text == "java.lang.String"
     assert !firstConstructorArg.hasInitialExpression()
 })
-@SingleConstructor(includes = "someProperty")
+@AutoConstructor(includes = "someProperty")
 class PropertiesWithIncludes {
     String someProperty
     List<String> someListProperty
@@ -123,7 +120,7 @@ class PropertiesWithIncludes {
     assert firstConstructorArg.type.text == "java.lang.String"
     assert !firstConstructorArg.hasInitialExpression()
 })
-@SingleConstructor(includeFields = true, includeProperties = false, excludes = 'metaClass')
+@AutoConstructor(includeFields = true, includeProperties = false, excludes = 'metaClass')
 class IgnoringPropertiesIncludingFields {
     private String someProperty
     List<String> someListProperty
@@ -143,7 +140,7 @@ class IgnoringPropertiesIncludingFields {
     assert firstConstructorArg.type.text == "java.lang.String"
     assert !firstConstructorArg.hasInitialExpression()
 })
-@SingleConstructor
+@AutoConstructor
 class PropertiesIgnoringFields {
     String someProperty
     private String someField1
@@ -173,7 +170,7 @@ class PropertiesIgnoringFields {
     assert thirdConstructorArg.type.text == "boolean"
     assert !thirdConstructorArg.hasInitialExpression()
 })
-@SingleConstructor(includeFields = true, excludes = "metaClass")
+@AutoConstructor(includeFields = true, excludes = "metaClass")
 class PropertiesIncludingFields {
     String someProperty
     private String someField1

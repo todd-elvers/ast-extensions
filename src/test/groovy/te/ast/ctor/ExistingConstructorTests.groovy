@@ -2,7 +2,6 @@ package te.ast.ctor
 
 import groovy.transform.ASTTest
 import org.codehaus.groovy.ast.ClassNode
-import te.ast.ctor.SingleConstructor
 
 import static org.codehaus.groovy.control.CompilePhase.CANONICALIZATION
 
@@ -19,7 +18,7 @@ import static org.codehaus.groovy.control.CompilePhase.CANONICALIZATION
     assert firstConstructorArg.type.text == "java.lang.String"
     assert !firstConstructorArg.hasInitialExpression()
 })
-@SingleConstructor
+@AutoConstructor
 class ExistingConstructor {
     String someField
     String someOtherField
@@ -54,7 +53,7 @@ class ExistingConstructor {
     assert secondConstructorSecondArg.type.text == "java.lang.String"
     assert !secondConstructorSecondArg.hasInitialExpression()
 })
-@SingleConstructor(force = true)
+@AutoConstructor(force = true)
 class ExistingConstructorWithForce {
     String someField
     String someOtherField

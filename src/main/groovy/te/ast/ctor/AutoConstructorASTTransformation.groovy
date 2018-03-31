@@ -39,9 +39,9 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.varX
 @CompileStatic
 @SuppressWarnings("GrMethodMayBeStatic")
 @GroovyASTTransformation(phase = CompilePhase.CANONICALIZATION)
-class SingleConstructorASTTransformation extends AbstractASTTransformation {
+class AutoConstructorASTTransformation extends AbstractASTTransformation {
 
-    private static final ClassNode MY_TYPE = make(SingleConstructor)
+    private static final ClassNode MY_TYPE = make(AutoConstructor)
     private static final ClassNode CANONICAL_ANNOTATION_CLASS = make(Canonical)
     private static final ClassNode HASH_MAP_TYPE = makeWithoutCaching(HashMap, false)
     private static final AnnotationNode INJECT_ANNOTATION = new AnnotationNode(make(Inject))
@@ -66,8 +66,10 @@ class SingleConstructorASTTransformation extends AbstractASTTransformation {
 
         if (isValidUseOfAST(annotation, annotatedClass, settings)) {
             ConstructorNode constructor = generateConstructor(annotatedClass, settings)
-
-            constructor.addAnnotation(INJECT_ANNOTATION)
+            System.err.println(settings.dump())
+            if(settings.addInjectAnnotation) {
+                constructor.addAnnotation(INJECT_ANNOTATION)
+            }
 
             addConstructor(annotatedClass, constructor)
         }
@@ -100,6 +102,7 @@ class SingleConstructorASTTransformation extends AbstractASTTransformation {
                 includeSuperProperties: memberHasValue(anno, "includeSuperProperties", true),
                 callSuper             : memberHasValue(anno, "callSuper", true),
                 force                 : memberHasValue(anno, "force", true),
+                addInjectAnnotation   : !memberHasValue(anno, "addInjectAnnotation", false),
                 excludes              : getMemberList(anno, "excludes"),
                 includes              : getMemberList(anno, "includes")
         ] as AnnotationSettings
@@ -125,7 +128,7 @@ class SingleConstructorASTTransformation extends AbstractASTTransformation {
 
     /**
      * Parses annotated class creating a constructor according to the settings configured
-     * in the {@link SingleConstructor} annotation.
+     * in the {@link AutoConstructor} annotation.
      *
      * <p>The resulting constructor has 0-n args and a corresponding number of "this.<field> = <arg>"
      * statements as its body.
@@ -165,7 +168,7 @@ class SingleConstructorASTTransformation extends AbstractASTTransformation {
             ctorStatements << assignS(propX(varX("this"), name), varX(nextParam))
         }
 
-        Parameter[] argsOfCtor = ctorParams.toArray(new Parameter[ctorParams.size()])
+        Parameter[] argsOfCtor = ctorParams.toArray(new Parameter[ctorParams.size()]) as Parameter[]
         BlockStatement bodyOfCtor = block(ctorStatements.toArray(new Statement[ctorStatements.size()]))
 
         return new ConstructorNode(ACC_PUBLIC, argsOfCtor, ClassNode.EMPTY_ARRAY, bodyOfCtor)

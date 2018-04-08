@@ -2,8 +2,86 @@ package te.ast.ctor
 
 import groovy.transform.ASTTest
 import org.codehaus.groovy.ast.ClassNode
+import spock.lang.Specification
 
 import static org.codehaus.groovy.control.CompilePhase.CANONICALIZATION
+
+class PropertiesTests extends Specification {
+
+    def "generated constructor correctly assigns properties"() {
+        given:
+            String firstArg = "someString"
+            List<String> secondArg = ["string", "string", "string"]
+
+        when:
+            def instance = new SingleProperty(firstArg)
+
+        then:
+            instance.someProperty == firstArg
+
+        when:
+            instance = new MultipleProperties(firstArg, secondArg)
+
+        then:
+            instance.someProperty == firstArg
+            instance.someListProperty == secondArg
+    }
+
+    def "setting 'excludes' parameter works"() {
+        given:
+            String firstArg = "someString"
+
+        when:
+            def instance = new PropertiesWithExcludes(firstArg)
+
+        then:
+            instance.someProperty == firstArg
+    }
+
+    def "setting 'include' parameter works"() {
+        given:
+            String firstArg = "someString"
+        when:
+            def instance = new PropertiesWithIncludes(firstArg)
+        then:
+            instance.someProperty == firstArg
+    }
+
+
+    def 'setting includeFields=true & includeProperties=false works'() {
+        given:
+            String firstArg = "someString"
+        when:
+            def instance = new IgnoringPropertiesIncludingFields(firstArg)
+        then:
+            instance.someProperty == firstArg
+    }
+
+    def 'setting includeFields=false & includeProperties=true works'() {
+        given:
+            String firstArg = "someString"
+        when:
+            def instance = new PropertiesIgnoringFields(firstArg)
+        then:
+            instance.someProperty == firstArg
+    }
+
+    def 'setting includeFields=true & includeProperties=true works'() {
+        given:
+            String firstArg = "someString"
+            String secondArg = "someOtherString"
+            boolean thirdArg = true
+        when:
+            def instance = new PropertiesIncludingFields(firstArg,secondArg,thirdArg)
+        then:
+            instance.someProperty == firstArg
+            instance.someField1 == secondArg
+            instance.someField2 == thirdArg
+
+    }
+
+}
+
 
 @ASTTest(phase = CANONICALIZATION, value = {
     def classNode = node as ClassNode
@@ -37,7 +115,7 @@ class ZeroProperties {
     assert !firstConstructorArg.hasInitialExpression()
 })
 @AutoConstructor
-class OneProperty {
+class SingleProperty {
     String someProperty
 }
 
@@ -63,7 +141,7 @@ class OneProperty {
     assert !secondConstructorArg.hasInitialExpression()
 })
 @AutoConstructor
-class TwoProperties {
+class MultipleProperties {
     String someProperty
     List<String> someListProperty
 }
@@ -83,8 +161,8 @@ class TwoProperties {
 })
 @AutoConstructor(excludes = "someListProperty")
 class PropertiesWithExcludes {
-    String someProperty
     List<String> someListProperty
+    String someProperty
 }
 
 
@@ -103,8 +181,8 @@ class PropertiesWithExcludes {
 })
 @AutoConstructor(includes = "someProperty")
 class PropertiesWithIncludes {
-    String someProperty
     List<String> someListProperty
+    String someProperty
 }
 
 @ASTTest(phase = CANONICALIZATION, value = {

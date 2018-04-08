@@ -66,7 +66,7 @@ class AutoConstructorASTTransformation extends AbstractASTTransformation {
 
         if (isValidUseOfAST(annotation, annotatedClass, settings)) {
             ConstructorNode constructor = generateConstructor(annotatedClass, settings)
-            System.err.println(settings.dump())
+
             if(settings.addInjectAnnotation) {
                 constructor.addAnnotation(INJECT_ANNOTATION)
             }

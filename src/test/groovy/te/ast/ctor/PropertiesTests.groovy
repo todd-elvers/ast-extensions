@@ -8,62 +8,51 @@ import static org.codehaus.groovy.control.CompilePhase.CANONICALIZATION
 
 class PropertiesTests extends Specification {
 
+    String arg1 = "someString"
+    List<String> secondArg = ["string", "string", "string"]
+
     def "generated constructor correctly assigns properties"() {
-        given:
-            String firstArg = "someString"
-            List<String> secondArg = ["string", "string", "string"]
-
         when:
-            def instance = new SingleProperty(firstArg)
+            def instance = new SingleProperty(arg1)
 
         then:
-            instance.someProperty == firstArg
+            instance.someProperty == arg1
 
         when:
-            instance = new MultipleProperties(firstArg, secondArg)
-
+            instance = new MultipleProperties(arg1, secondArg)
         then:
-            instance.someProperty == firstArg
+            instance.someProperty == arg1
             instance.someListProperty == secondArg
     }
 
     def "setting 'excludes' parameter works"() {
-        given:
-            String firstArg = "someString"
-
         when:
-            def instance = new PropertiesWithExcludes(firstArg)
+            def instance = new PropertiesWithExcludes(arg1)
 
         then:
-            instance.someProperty == firstArg
+            instance.someProperty == arg1
     }
 
     def "setting 'include' parameter works"() {
-        given:
-            String firstArg = "someString"
         when:
-            def instance = new PropertiesWithIncludes(firstArg)
+            def instance = new PropertiesWithIncludes(arg1)
         then:
-            instance.someProperty == firstArg
+            instance.someProperty == arg1
     }
 
 
     def 'setting includeFields=true & includeProperties=false works'() {
-        given:
-            String firstArg = "someString"
         when:
-            def instance = new IgnoringPropertiesIncludingFields(firstArg)
+            def instance = new IgnoringPropertiesIncludingFields(arg1)
         then:
-            instance.someProperty == firstArg
+            instance.someProperty == arg1
     }
 
     def 'setting includeFields=false & includeProperties=true works'() {
-        given:
-            String firstArg = "someString"
         when:
-            def instance = new PropertiesIgnoringFields(firstArg)
+            def instance = new PropertiesIgnoringFields(arg1)
         then:
-            instance.someProperty == firstArg
+            instance.someProperty == arg1
     }
 
     def 'setting includeFields=true & includeProperties=true works'() {
@@ -72,12 +61,11 @@ class PropertiesTests extends Specification {
             String secondArg = "someOtherString"
             boolean thirdArg = true
         when:
-            def instance = new PropertiesIncludingFields(firstArg,secondArg,thirdArg)
+            def instance = new PropertiesIncludingFields(firstArg, secondArg, thirdArg)
         then:
             instance.someProperty == firstArg
             instance.someField1 == secondArg
             instance.someField2 == thirdArg
-
     }
 
 }
@@ -100,7 +88,6 @@ class ZeroProperties {
 }
 
 
-
 @ASTTest(phase = CANONICALIZATION, value = {
     def classNode = node as ClassNode
 
@@ -118,7 +105,6 @@ class ZeroProperties {
 class SingleProperty {
     String someProperty
 }
-
 
 
 @ASTTest(phase = CANONICALIZATION, value = {

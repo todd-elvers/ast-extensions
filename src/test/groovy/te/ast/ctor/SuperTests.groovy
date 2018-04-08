@@ -42,10 +42,6 @@ class SuperTests extends Specification {
     }
 
     def "setting includeSuperProperties=true & callSuper=true works"() {
-        given:
-            String arg1 = "arg1"
-            String arg2 = "arg2"
-
         when:
             def instance = new SuperWithPropertyAndConstructor(arg1, arg2)
 

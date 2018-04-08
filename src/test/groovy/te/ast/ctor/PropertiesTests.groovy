@@ -72,16 +72,14 @@ class PropertiesTests extends Specification {
 
 
 @ASTTest(phase = CANONICALIZATION, value = {
-    def classNode = node as ClassNode
+    when: 'we inspect the result of applying our AST to the class below'
+        def annotatedClass = node as ClassNode
 
-    // Should only have one constructor with no args
-    assert classNode.declaredConstructors.size() == 1
-    assert classNode.declaredConstructors[0].parameters.size() == 0
-
-    // That constructor should be the no-arg constructor
-    def constructor = classNode.declaredConstructors[0]
-    assert constructor.name == "<init>"
-    assert !constructor.parameters
+    then: 'we find 1 constructor with 0 args'
+        assert annotatedClass.declaredConstructors.size() == 1
+        assert annotatedClass.declaredConstructors[0].parameters.size() == 0
+        assert annotatedClass.declaredConstructors[0].name == "<init>"
+        assert !annotatedClass.declaredConstructors[0].parameters
 })
 @AutoConstructor
 class ZeroProperties {
@@ -89,17 +87,18 @@ class ZeroProperties {
 
 
 @ASTTest(phase = CANONICALIZATION, value = {
-    def classNode = node as ClassNode
+    when: 'we inspect the result of applying our AST to the class below'
+        def annotatedClass = node as ClassNode
 
-    // Should only have one constructor with one arg
-    assert classNode.declaredConstructors.size() == 1
-    assert classNode.declaredConstructors[0].parameters.size() == 1
+    then: 'we find 1 constructor with 1 arg'
+        assert annotatedClass.declaredConstructors.size() == 1
+        assert annotatedClass.declaredConstructors[0].parameters.size() == 1
 
-    // That arg should be our property without a default value
-    def firstConstructorArg = classNode.declaredConstructors[0].parameters[0]
-    assert firstConstructorArg.name == "someProperty"
-    assert firstConstructorArg.type.text == "java.lang.String"
-    assert !firstConstructorArg.hasInitialExpression()
+    and: 'that arg is our property, without a default value'
+        def arg1 = annotatedClass.declaredConstructors[0].parameters[0]
+        assert arg1.name == "someProperty"
+        assert arg1.type.text == "java.lang.String"
+        assert !arg1.hasInitialExpression()
 })
 @AutoConstructor
 class SingleProperty {
@@ -108,23 +107,23 @@ class SingleProperty {
 
 
 @ASTTest(phase = CANONICALIZATION, value = {
-    def classNode = node as ClassNode
+    when: 'we inspect the result of applying our AST to the class below'
+        def annotatedClass = node as ClassNode
 
-    // Should only have one constructor with two args
-    assert classNode.declaredConstructors.size() == 1
-    assert classNode.declaredConstructors[0].parameters.size() == 2
+    then: 'we find 1 constructor with 2 args'
+        assert annotatedClass.declaredConstructors.size() == 1
+        assert annotatedClass.declaredConstructors[0].parameters.size() == 2
 
-    // First arg should be our first property without a default value
-    def firstConstructorArg = classNode.declaredConstructors[0].parameters[0]
-    assert firstConstructorArg.name == "someProperty"
-    assert firstConstructorArg.type.text == "java.lang.String"
-    assert !firstConstructorArg.hasInitialExpression()
+    and: 'those args are ordered how they are listed in the class from top to bottom'
+        def arg1 = annotatedClass.declaredConstructors[0].parameters[0]
+        assert arg1.name == "someProperty"
+        assert arg1.type.text == "java.lang.String"
+        assert !arg1.hasInitialExpression()
 
-    // Second arg should be our second property without a default value
-    def secondConstructorArg = classNode.declaredConstructors[0].parameters[1]
-    assert secondConstructorArg.name == "someListProperty"
-    assert secondConstructorArg.type.text == "java.util.List"
-    assert !secondConstructorArg.hasInitialExpression()
+        def arg2 = annotatedClass.declaredConstructors[0].parameters[1]
+        assert arg2.name == "someListProperty"
+        assert arg2.type.text == "java.util.List"
+        assert !arg2.hasInitialExpression()
 })
 @AutoConstructor
 class MultipleProperties {
@@ -133,17 +132,18 @@ class MultipleProperties {
 }
 
 @ASTTest(phase = CANONICALIZATION, value = {
-    def classNode = node as ClassNode
+    when: 'we inspect the result of applying our AST to the class below'
+        def annotatedClass = node as ClassNode
 
-    // Should only have one constructor with one args
-    assert classNode.declaredConstructors.size() == 1
-    assert classNode.declaredConstructors[0].parameters.size() == 1
+    then: 'we find 1 constructor with 1 arg'
+        assert annotatedClass.declaredConstructors.size() == 1
+        assert annotatedClass.declaredConstructors[0].parameters.size() == 1
 
-    // Only arg should be the property we didn't specify in the 'excludes' list
-    def firstConstructorArg = classNode.declaredConstructors[0].parameters[0]
-    assert firstConstructorArg.name == "someProperty"
-    assert firstConstructorArg.type.text == "java.lang.String"
-    assert !firstConstructorArg.hasInitialExpression()
+    and: "that arg is the property/field we did not specify in the 'excludes' parameter"
+        def arg1 = annotatedClass.declaredConstructors[0].parameters[0]
+        assert arg1.name == "someProperty"
+        assert arg1.type.text == "java.lang.String"
+        assert !arg1.hasInitialExpression()
 })
 @AutoConstructor(excludes = "someListProperty")
 class PropertiesWithExcludes {
@@ -153,17 +153,18 @@ class PropertiesWithExcludes {
 
 
 @ASTTest(phase = CANONICALIZATION, value = {
-    def classNode = node as ClassNode
+    when: 'we inspect the result of applying our AST to the class below'
+        def annotatedClass = node as ClassNode
 
-    // Should only have one constructor with one args
-    assert classNode.declaredConstructors.size() == 1
-    assert classNode.declaredConstructors[0].parameters.size() == 1
+    then: 'we find 1 constructor with 1 arg'
+        assert annotatedClass.declaredConstructors.size() == 1
+        assert annotatedClass.declaredConstructors[0].parameters.size() == 1
 
-    // Only arg should be the property we specified in the 'includes' list
-    def firstConstructorArg = classNode.declaredConstructors[0].parameters[0]
-    assert firstConstructorArg.name == "someProperty"
-    assert firstConstructorArg.type.text == "java.lang.String"
-    assert !firstConstructorArg.hasInitialExpression()
+    and: "that arg is the property/field we specified in the 'includes' parameter"
+        def arg1 = annotatedClass.declaredConstructors[0].parameters[0]
+        assert arg1.name == "someProperty"
+        assert arg1.type.text == "java.lang.String"
+        assert !arg1.hasInitialExpression()
 })
 @AutoConstructor(includes = "someProperty")
 class PropertiesWithIncludes {
@@ -172,17 +173,18 @@ class PropertiesWithIncludes {
 }
 
 @ASTTest(phase = CANONICALIZATION, value = {
-    def classNode = node as ClassNode
+    when: 'we inspect the result of applying our AST to the class below'
+        def annotatedClass = node as ClassNode
 
-    // Should only have one constructor with one args
-    assert classNode.declaredConstructors.size() == 1
-    assert classNode.declaredConstructors[0].parameters.size() == 1
+    then: 'we find only 1 constructor with 1 arg'
+        assert annotatedClass.declaredConstructors.size() == 1
+        assert annotatedClass.declaredConstructors[0].parameters.size() == 1
 
-    // Only arg should be the only field of the class, and no properties
-    def firstConstructorArg = classNode.declaredConstructors[0].parameters[0]
-    assert firstConstructorArg.name == "someProperty"
-    assert firstConstructorArg.type.text == "java.lang.String"
-    assert !firstConstructorArg.hasInitialExpression()
+    and: 'that arg is for the field of our class, not the property'
+        def arg1 = annotatedClass.declaredConstructors[0].parameters[0]
+        assert arg1.name == "someProperty"
+        assert arg1.type.text == "java.lang.String"
+        assert !arg1.hasInitialExpression()
 })
 @AutoConstructor(includeFields = true, includeProperties = false, excludes = 'metaClass')
 class IgnoringPropertiesIncludingFields {
@@ -192,17 +194,18 @@ class IgnoringPropertiesIncludingFields {
 
 
 @ASTTest(phase = CANONICALIZATION, value = {
-    def classNode = node as ClassNode
+    when: 'we inspect the result of applying our AST to the class below'
+        def annotatedClass = node as ClassNode
 
-    // Should only have one constructor with one arg
-    assert classNode.declaredConstructors.size() == 1
-    assert classNode.declaredConstructors[0].parameters.size() == 1
+    then: 'we find one constructor with 1 arg'
+        assert annotatedClass.declaredConstructors.size() == 1
+        assert annotatedClass.declaredConstructors[0].parameters.size() == 1
 
-    // That arg should be our property without a default value
-    def firstConstructorArg = classNode.declaredConstructors[0].parameters[0]
-    assert firstConstructorArg.name == "someProperty"
-    assert firstConstructorArg.type.text == "java.lang.String"
-    assert !firstConstructorArg.hasInitialExpression()
+    and: 'that arg is our property and does not have a default value'
+        def arg1 = annotatedClass.declaredConstructors[0].parameters[0]
+        assert arg1.name == "someProperty"
+        assert arg1.type.text == "java.lang.String"
+        assert !arg1.hasInitialExpression()
 })
 @AutoConstructor
 class PropertiesIgnoringFields {
@@ -213,26 +216,28 @@ class PropertiesIgnoringFields {
 
 
 @ASTTest(phase = CANONICALIZATION, value = {
-    def classNode = node as ClassNode
+    when: 'we inspect the result of applying our AST to the class below'
+        def annotatedClass = node as ClassNode
 
-    // Should only have one constructor with 3 args, excluding metaClass
-    assert classNode.declaredConstructors.size() == 1
-    assert classNode.declaredConstructors[0].parameters.size() == 3
+    then: 'we find 1 constructor with 3 args'
+        assert annotatedClass.declaredConstructors.size() == 1
+        assert annotatedClass.declaredConstructors[0].parameters.size() == 3
 
-    def firstConstructorArg = classNode.declaredConstructors[0].parameters[0]
-    assert firstConstructorArg.name == "someProperty"
-    assert firstConstructorArg.type.text == "java.lang.String"
-    assert !firstConstructorArg.hasInitialExpression()
+    and: 'the args are in the same order as they are listed in the class'
+        def arg1 = annotatedClass.declaredConstructors[0].parameters[0]
+        assert arg1.name == "someProperty"
+        assert arg1.type.text == "java.lang.String"
+        assert !arg1.hasInitialExpression()
 
-    def secondConstructorArg = classNode.declaredConstructors[0].parameters[1]
-    assert secondConstructorArg.name == "someField1"
-    assert secondConstructorArg.type.text == "java.lang.String"
-    assert !secondConstructorArg.hasInitialExpression()
+        def arg2 = annotatedClass.declaredConstructors[0].parameters[1]
+        assert arg2.name == "someField1"
+        assert arg2.type.text == "java.lang.String"
+        assert !arg2.hasInitialExpression()
 
-    def thirdConstructorArg = classNode.declaredConstructors[0].parameters[2]
-    assert thirdConstructorArg.name == "someField2"
-    assert thirdConstructorArg.type.text == "boolean"
-    assert !thirdConstructorArg.hasInitialExpression()
+        def arg3 = annotatedClass.declaredConstructors[0].parameters[2]
+        assert arg3.name == "someField2"
+        assert arg3.type.text == "boolean"
+        assert !arg3.hasInitialExpression()
 })
 @AutoConstructor(includeFields = true, excludes = "metaClass")
 class PropertiesIncludingFields {

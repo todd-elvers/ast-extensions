@@ -5,7 +5,6 @@ import org.codehaus.groovy.ast.ClassNode
 
 import static org.codehaus.groovy.control.CompilePhase.CANONICALIZATION
 
-
 @ASTTest(phase = CANONICALIZATION, value = {
     when: 'we inspect the result of applying our AST to the class below'
         def annotatedClass = node as ClassNode
@@ -34,12 +33,11 @@ class InjectEnabled {
     then: "there's only one constructor"
         assert annotatedClass.declaredConstructors.size() == 1
         def constructor = annotatedClass.declaredConstructors[0]
-        assert constructor
 
     and: "it only accepts one parameter"
         assert constructor.parameters.size() == 1
 
-    and: 'the constructor is not annotated with @Inject'
+    and: 'it is not annotated with @Inject'
         assert constructor.annotations.isEmpty()
 })
 @AutoConstructor(addInjectAnnotation = false)

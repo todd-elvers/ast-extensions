@@ -55,10 +55,10 @@ class ExistingConstructorTests extends Specification {
         assert annotatedClass.declaredConstructors[0].parameters.size() == 1
 
     and: "it has the original parameter too"
-        def firstConstructorArg = annotatedClass.declaredConstructors[0].parameters[0]
-        assert firstConstructorArg.name == "someField"
-        assert firstConstructorArg.type.text == "java.lang.String"
-        assert !firstConstructorArg.hasInitialExpression()
+        def arg1 = annotatedClass.declaredConstructors[0].parameters[0]
+        assert arg1.name == "someField"
+        assert arg1.type.text == "java.lang.String"
+        assert !arg1.hasInitialExpression()
 })
 @AutoConstructor
 class ExistingConstructorUsingDefaults {
@@ -81,20 +81,20 @@ class ExistingConstructorUsingDefaults {
 
     and: 'the existing one'
         assert annotatedClass.declaredConstructors[0].parameters.size() == 1
-        def firstConstructorFirstArg = annotatedClass.declaredConstructors[0].parameters[0]
-        assert firstConstructorFirstArg.name == "someField"
-        assert firstConstructorFirstArg.type.text == "java.lang.String"
-        assert !firstConstructorFirstArg.hasInitialExpression()
+        def ctor1arg1 = annotatedClass.declaredConstructors[0].parameters[0]
+        assert ctor1arg1.name == "someField"
+        assert ctor1arg1.type.text == "java.lang.String"
+        assert !ctor1arg1.hasInitialExpression()
 
     and: 'the one we added'
-        def secondConstructorFirstArg = annotatedClass.declaredConstructors[1].parameters[0]
-        assert secondConstructorFirstArg.name == "someField"
-        assert secondConstructorFirstArg.type.text == "java.lang.String"
-        assert !secondConstructorFirstArg.hasInitialExpression()
-        def secondConstructorSecondArg = annotatedClass.declaredConstructors[1].parameters[1]
-        assert secondConstructorSecondArg.name == "someOtherField"
-        assert secondConstructorSecondArg.type.text == "java.lang.String"
-        assert !secondConstructorSecondArg.hasInitialExpression()
+        def ctor2arg1 = annotatedClass.declaredConstructors[1].parameters[0]
+        assert ctor2arg1.name == "someField"
+        assert ctor2arg1.type.text == "java.lang.String"
+        assert !ctor2arg1.hasInitialExpression()
+        def ctor2arg2 = annotatedClass.declaredConstructors[1].parameters[1]
+        assert ctor2arg2.name == "someOtherField"
+        assert ctor2arg2.type.text == "java.lang.String"
+        assert !ctor2arg2.hasInitialExpression()
 })
 @AutoConstructor(force = true)
 class ExistingConstructorWithForce {

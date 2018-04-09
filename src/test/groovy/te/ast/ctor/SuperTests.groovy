@@ -52,6 +52,10 @@ class SuperTests extends Specification {
 }
 
 
+////////////////////////////////////////////
+//////////// Compile time tests ////////////
+////////////////////////////////////////////
+
 @ASTTest(phase = CANONICALIZATION, value = {
     when: 'we inspect the result of applying our AST to the class below'
         def annotatedClass = node as ClassNode

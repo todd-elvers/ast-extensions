@@ -1,6 +1,5 @@
 package te.ast.ctor
 
-import groovy.transform.Canonical
 import groovy.transform.CompileStatic
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.AnnotatedNode
@@ -10,6 +9,7 @@ import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.ConstructorNode
 import org.codehaus.groovy.ast.FieldNode
 import org.codehaus.groovy.ast.Parameter
+import org.codehaus.groovy.ast.VariableScope
 import org.codehaus.groovy.ast.expr.Expression
 import org.codehaus.groovy.ast.stmt.BlockStatement
 import org.codehaus.groovy.ast.stmt.Statement
@@ -18,7 +18,6 @@ import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.transform.AbstractASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
 import org.codehaus.groovy.transform.TupleConstructorASTTransformation
-import te.ast.ctor.domain.AnnotationSettings
 
 import javax.inject.Inject
 
@@ -35,14 +34,12 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.getSuperPropertyFields
 import static org.codehaus.groovy.ast.tools.GeneralUtils.propX
 import static org.codehaus.groovy.ast.tools.GeneralUtils.varX
 
-//TODO: Look for more utility methods that could simplify this logic.
 @CompileStatic
 @SuppressWarnings("GrMethodMayBeStatic")
 @GroovyASTTransformation(phase = CompilePhase.CANONICALIZATION)
 class AutoConstructorASTTransformation extends AbstractASTTransformation {
 
     private static final ClassNode MY_TYPE = make(AutoConstructor)
-    private static final ClassNode CANONICAL_ANNOTATION_CLASS = make(Canonical)
     private static final ClassNode HASH_MAP_TYPE = makeWithoutCaching(HashMap, false)
     private static final AnnotationNode INJECT_ANNOTATION = new AnnotationNode(make(Inject))
     private static final String MY_TYPE_NAME = "@" + MY_TYPE.getNameWithoutPackage()
@@ -59,10 +56,7 @@ class AutoConstructorASTTransformation extends AbstractASTTransformation {
     }
 
     protected void visitClass(ClassNode annotatedClass, AnnotationNode annotation) {
-        AnnotationSettings settings = readSettingsFromAnnotation(annotation)
-        if (hasAnnotation(annotatedClass, CANONICAL_ANNOTATION_CLASS)) {
-            copySettingsFromCanonicalAST(annotatedClass, settings)
-        }
+        AutoConstructorSettings settings = AutoConstructorParser.parse(annotation)
 
         if (isValidUseOfAST(annotation, annotatedClass, settings)) {
             ConstructorNode constructor = generateConstructor(annotatedClass, settings)
@@ -75,47 +69,25 @@ class AutoConstructorASTTransformation extends AbstractASTTransformation {
         }
     }
 
-    protected boolean isValidUseOfAST(AnnotationNode anno, ClassNode annotatedClass, AnnotationSettings astParams) {
+    protected boolean isValidUseOfAST(AnnotationNode anno, ClassNode annotatedClass, AutoConstructorSettings settings) {
         // Annotation not allowed on interfaces
         if(!checkNotInterface(annotatedClass, MY_TYPE_NAME)) return false
 
         // Cannot proceed if 'includes' & 'excludes' are improperly configured
-        if(!checkIncludeExclude(anno, astParams.excludes, astParams.includes, MY_TYPE_NAME)) return false
+        if(!checkIncludeExclude(anno, settings.excludes, settings.includes, MY_TYPE_NAME)) return false
 
-        // Don't do anything if constructors exist and force is set to false
+        // Cannot proceed if there's more than 1 constructor, unless force=true
         List<ConstructorNode> constructors = annotatedClass.declaredConstructors
-        if(constructors.size() > 1 && !astParams.force) return false
-        boolean foundEmpty = constructors.size() == 1 && !constructors.first().firstStatement
-        if(constructors.size() == 1 && !foundEmpty && !astParams.force) return false
+        if(constructors.size() > 1 && !settings.force) return false
 
-        // HACK: JavaStubGenerator could have snuck in a constructor we don't want
-        if (foundEmpty) constructors.remove(0)
+        // Cannot proceed if there's 1 constructor, unless it's the empty constructor or force=true
+        boolean foundEmptyConstructor = constructors.size() == 1 && !constructors.first().firstStatement
+        if(constructors.size() == 1 && !foundEmptyConstructor && !settings.force) return false
+
+        // If we did find the empty constructor, remove it (JavaStubGenerator may have snuck one in)
+        if (foundEmptyConstructor) constructors.remove(0)
 
         return true
-    }
-
-    protected AnnotationSettings readSettingsFromAnnotation(AnnotationNode anno) {
-        return [
-                includeFields         : memberHasValue(anno, "includeFields", true),
-                includeProperties     : !memberHasValue(anno, "includeProperties", false),
-                includeSuperFields    : memberHasValue(anno, "includeSuperFields", true),
-                includeSuperProperties: memberHasValue(anno, "includeSuperProperties", true),
-                callSuper             : memberHasValue(anno, "callSuper", true),
-                force                 : memberHasValue(anno, "force", true),
-                addInjectAnnotation   : !memberHasValue(anno, "addInjectAnnotation", false),
-                excludes              : getMemberList(anno, "excludes"),
-                includes              : getMemberList(anno, "includes")
-        ] as AnnotationSettings
-    }
-
-    protected void copySettingsFromCanonicalAST(ClassNode annotatedClass, AnnotationSettings settings) {
-        AnnotationNode canonical = annotatedClass.getAnnotations(CANONICAL_ANNOTATION_CLASS).first()
-        if (!settings.excludes) {
-            settings.excludes = getMemberList(canonical, "excludes")
-        }
-        if (!settings.includes) {
-            settings.includes = getMemberList(canonical, "includes")
-        }
     }
 
     protected void addConstructor(ClassNode annotatedClass, ConstructorNode constructor) {
@@ -133,13 +105,13 @@ class AutoConstructorASTTransformation extends AbstractASTTransformation {
      * <p>The resulting constructor has 0-n args and a corresponding number of "this.<field> = <arg>"
      * statements as its body.
      */
-    protected static ConstructorNode generateConstructor(ClassNode annotatedClass, AnnotationSettings settings) {
-        List<Statement> ctorStatements = []
+    protected ConstructorNode generateConstructor(ClassNode annotatedClass, AutoConstructorSettings settings) {
         List<Parameter> ctorParams = []
+        List<Statement> ctorStatements = []
         List<Expression> superCtorExpressions = []
 
         // Parse fields from super
-        List<FieldNode> superFieldNodes = collectSuperFieldNodes(annotatedClass, settings)
+        List<FieldNode> superFieldNodes = getSuperFields(annotatedClass, settings)
         superFieldNodes.each { FieldNode fNode ->
             if (shouldSkip(fNode.name, settings.excludes, settings.includes)) return
 
@@ -158,7 +130,7 @@ class AutoConstructorASTTransformation extends AbstractASTTransformation {
         }
 
         // Parse fields from instance
-        List<FieldNode> instanceFieldNodes = collectInstanceFieldNodes(annotatedClass, settings)
+        List<FieldNode> instanceFieldNodes = getClassFields(annotatedClass, settings)
         instanceFieldNodes.each { FieldNode fNode ->
             if (shouldSkip(fNode.name, settings.excludes, settings.includes)) return
 
@@ -169,12 +141,12 @@ class AutoConstructorASTTransformation extends AbstractASTTransformation {
         }
 
         Parameter[] argsOfCtor = ctorParams.toArray(new Parameter[ctorParams.size()]) as Parameter[]
-        BlockStatement bodyOfCtor = block(ctorStatements.toArray(new Statement[ctorStatements.size()]))
+        BlockStatement bodyOfCtor = block(new VariableScope(), ctorStatements)
 
         return new ConstructorNode(ACC_PUBLIC, argsOfCtor, ClassNode.EMPTY_ARRAY, bodyOfCtor)
     }
 
-    protected static List<FieldNode> collectSuperFieldNodes(ClassNode annotatedClass, AnnotationSettings settings) {
+    protected List<FieldNode> getSuperFields(ClassNode annotatedClass, AutoConstructorSettings settings) {
         List<FieldNode> superFields = []
         if (settings.includeSuperProperties) {
             superFields += getSuperPropertyFields(annotatedClass.getSuperClass())
@@ -185,7 +157,7 @@ class AutoConstructorASTTransformation extends AbstractASTTransformation {
         return superFields
     }
 
-    protected static List<FieldNode> collectInstanceFieldNodes(ClassNode annotatedClass, AnnotationSettings settings) {
+    protected List<FieldNode> getClassFields(ClassNode annotatedClass, AutoConstructorSettings settings) {
         List<FieldNode> fields = []
         if (settings.includeProperties) {
             fields += getInstancePropertyFields(annotatedClass)
@@ -200,7 +172,7 @@ class AutoConstructorASTTransformation extends AbstractASTTransformation {
      * Adds a map constructor to a class if the first constructor {@link Parameter}
      * is of type {@link Map} or some superclass of {@link HashMap} (excluding LinkedHashMap).
      */
-    private static void handleMapConstructorInjection(ClassNode annotatedClass, Parameter[] constructorArgs) {
+    protected void handleMapConstructorInjection(ClassNode annotatedClass, Parameter[] constructorArgs) {
         ClassNode firstParam = constructorArgs.first().getType()
 
         // add map constructor if needed, don't do it for LinkedHashMap for now (would lead to duplicate signature)
@@ -226,7 +198,7 @@ class AutoConstructorASTTransformation extends AbstractASTTransformation {
      * To reduce code duplication we simply delegate to {@link TupleConstructorASTTransformation}
      * since it already does what we need here.
      */
-    private static void addMapConstructors(ClassNode annotatedClass) {
+    protected void addMapConstructors(ClassNode annotatedClass) {
         TupleConstructorASTTransformation.addMapConstructors(
                 annotatedClass,
                 true,

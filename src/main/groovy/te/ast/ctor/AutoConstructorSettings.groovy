@@ -1,16 +1,17 @@
-package te.ast.ctor.domain
+package te.ast.ctor
 
 import groovy.transform.CompileStatic
+import groovy.transform.EqualsAndHashCode
 import groovy.transform.ToString
-import te.ast.ctor.AutoConstructor
 
 /**
  * Represents the values parsed from the {@link AutoConstructor} annotation.
  * Every function in that annotation will have a corresponding field here.
  */
 @CompileStatic
+@EqualsAndHashCode
 @ToString(includePackage = false, includeNames = true)
-class AnnotationSettings {
+class AutoConstructorSettings {
     boolean includeFields,
             includeProperties,
             includeSuperFields,

@@ -39,5 +39,6 @@ class BookService {
 <br/>
  
 
-#### NOTE
-No releases currently, this is still in alpha.
+#### Progress
+All features are working & the code is very heavily tested!
+v1.0.0 will be released next week.

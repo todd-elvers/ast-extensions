@@ -41,4 +41,4 @@ class BookService {
 
 #### Progress
 All features are working & the code is very heavily tested!
-v1.0.0 will be released next week.
+No release schedule currently available though.  Open an issue if you actually need this.
